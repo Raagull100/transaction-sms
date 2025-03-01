@@ -43,21 +43,31 @@ class _MyAppState extends State<MyApp> {
     );
   }
 
-  Future<void> _readSms() async {
-    var status = await Permission.sms.status;
-    if (status.isGranted) {
-      List<SmsMessage> messages = await _query.querySms(
-        kinds: [SmsQueryKind.inbox],
-        count: 50, // Fetch last 50 messages
-      );
-      
-      List<Transaction> transactions = messages.map((msg) => detectTransaction(msg.body ?? "")).whereType<Transaction>().toList();
-      
-      setState(() => _transactions = transactions);
-    } else {
-      await Permission.sms.request();
-    }
+ Future<void> _readSms() async {
+  var status = await Permission.sms.status;
+  if (status.isGranted) {
+    List<SmsMessage> messages = await _query.querySms(
+      kinds: [SmsQueryKind.inbox],
+      count: 300, // Fetch more messages to ensure we get the past month's data
+    );
+
+    // Get timestamp for one month ago
+    DateTime oneMonthAgo = DateTime.now().subtract(const Duration(days: 30));
+    int oneMonthAgoMillis = oneMonthAgo.millisecondsSinceEpoch;
+
+    // Filter messages from the last month
+    List<Transaction> transactions = messages
+        .where((msg) => msg.date != null && msg.date!.isAfter(oneMonthAgo))
+        .map((msg) => detectTransaction(msg.body ?? ""))
+        .whereType<Transaction>()
+        .toList();
+
+    setState(() => _transactions = transactions);
+  } else {
+    await Permission.sms.request();
   }
+}
+
 }
 
 Transaction? detectTransaction(String message) {
